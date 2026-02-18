@@ -4,18 +4,21 @@
 
 # NVIDIA SMI API
 
-A lightweight Go service that exposes **nvidia-smi** GPU metrics via a REST endpoint and a real-time WebSocket stream.
+Debugging and visibility tool for local Ollama GPU clusters.
+
+Built to work with [ollama-ripper](https://github.com/shostkevych/ollama-ripper).
 
 </div>
 
 ---
 
-Both endpoints serve identical data — GPU stats, memory, utilization, power, PCIe info, and running compute processes — refreshed every second from a single background poller.
+Lightweight Go service that exposes **nvidia-smi** GPU metrics and **Ollama** model stats via REST endpoints and a real-time WebSocket stream. GPU metrics refresh every 1s, Ollama stats every 5s.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/gpus` | JSON snapshot of all GPU metrics |
-| GET | `/ws` | WebSocket stream, pushes JSON every 1s |
+| GET | `/api/gpus` | GPU metrics — temp, power, memory, utilization, PCIe, processes |
+| GET | `/api/ollama/stats` | Ollama — running models, VRAM, KV cache budget, context window |
+| GET | `/ws` | WebSocket stream — both GPU + Ollama combined, every 1s |
 
 ## Setup Go on Ubuntu
 
@@ -45,7 +48,7 @@ cd go-smi-api
 # Build
 go build -o go-smi-api .
 
-# Run (requires nvidia-smi on the host)
+# Run (requires nvidia-smi and Ollama on the host)
 ./go-smi-api
 # listening on :8080
 ```
@@ -53,9 +56,12 @@ go build -o go-smi-api .
 ## Usage
 
 ```bash
-# REST
+# GPU metrics
 curl http://localhost:8080/api/gpus | jq .
 
-# WebSocket
+# Ollama stats
+curl http://localhost:8080/api/ollama/stats | jq .
+
+# WebSocket (GPU + Ollama combined)
 websocat ws://localhost:8080/ws
 ```

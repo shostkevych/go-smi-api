@@ -15,18 +15,32 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
-	monitor := NewGPUMonitor()
-	monitor.Start()
-	defer monitor.Stop()
+	gpuMon := NewGPUMonitor()
+	gpuMon.Start()
+	defer gpuMon.Stop()
+
+	ollamaMon := NewOllamaMonitor()
+	ollamaMon.Start()
+	defer ollamaMon.Stop()
 
 	http.HandleFunc("/api/gpus", func(w http.ResponseWriter, r *http.Request) {
-		metrics := monitor.Latest()
+		metrics := gpuMon.Latest()
 		if metrics == nil {
 			http.Error(w, "no data yet", http.StatusServiceUnavailable)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(metrics)
+	})
+
+	http.HandleFunc("/api/ollama/stats", func(w http.ResponseWriter, r *http.Request) {
+		stats := ollamaMon.Latest()
+		if stats == nil {
+			http.Error(w, "no data yet", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(stats)
 	})
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -41,11 +55,14 @@ func main() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			metrics := monitor.Latest()
-			if metrics == nil {
-				continue
+			payload := struct {
+				GPU    *GPUMetrics  `json:"gpu"`
+				Ollama *OllamaStats `json:"ollama"`
+			}{
+				GPU:    gpuMon.Latest(),
+				Ollama: ollamaMon.Latest(),
 			}
-			if err := conn.WriteJSON(metrics); err != nil {
+			if err := conn.WriteJSON(payload); err != nil {
 				break
 			}
 		}
